@@ -1,6 +1,6 @@
-FROM n8nio/n8n
-
-ENV N8N_HOST=0.0.0.0
-ENV N8N_PORT=5678
-
-EXPOSE 5678
+FROM node:18
+RUN apt-get update && apt-get install -y ffmpeg
+WORKDIR /app
+COPY . .
+RUN npm install
+CMD ["npm","start"]
