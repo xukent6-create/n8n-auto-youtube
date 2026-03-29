@@ -7,4 +7,6 @@ RUN npm install
 
 COPY . .
 
-CMD ["npm", "start"]
+EXPOSE 5678
+
+CMD ["npx", "n8n"]
