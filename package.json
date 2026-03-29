@@ -1,9 +1,0 @@
-{
-  "name": "n8n-auto-youtube",
-  "version": "1.0.0",
-  "dependencies": {
-    "n8n": "^2.0.0",
-    "axios": "^1.6.0",
-    "dotenv": "^16.0.0"
-  }
-}
