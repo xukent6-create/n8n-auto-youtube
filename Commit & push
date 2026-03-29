@@ -1,3 +1,0 @@
-git add .
-git commit -m "Init n8n-auto-youtube project"
-git push origin main
