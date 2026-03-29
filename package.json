@@ -1,11 +1,11 @@
 {
-  "name": "n8n-server",
+  "name": "video-render",
   "version": "1.0.0",
-  "private": true,
+  "main": "server.js",
   "scripts": {
-    "start": "npx n8n"
+    "start": "node server.js"
   },
   "dependencies": {
-    "n8n": "latest"
+    "express": "^4.18.2"
   }
 }
