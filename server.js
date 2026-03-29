@@ -1,41 +1,49 @@
 const express = require("express");
+const ffmpeg = require("fluent-ffmpeg");
 const fs = require("fs-extra");
 const axios = require("axios");
-const ffmpeg = require("fluent-ffmpeg");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Server running OK");
-});
+const downloadFile = async (url, path) => {
+  const writer = fs.createWriteStream(path);
+  const response = await axios({ url, method: "GET", responseType: "stream" });
+  response.data.pipe(writer);
+  return new Promise((resolve, reject) => {
+    writer.on("finish", resolve);
+    writer.on("error", reject);
+  });
+};
 
 app.post("/render", async (req, res) => {
   try {
-    const { script, audio_url } = req.body;
+    const id = uuidv4();
+    const audioPath = `audio-${id}.mp3`;
+    const videoPath = `video-${id}.mp4`;
+    const outputPath = `output-${id}.mp4`;
 
-    const videoUrl = "https://cdn.pixabay.com/video/2023/05/15/163102-826671914_large.mp4";
+    const { audioUrl, videoUrl, text } = req.body;
 
-    await fs.ensureDir("temp");
-
-    const videoPath = "temp/video.mp4";
-    const audioPath = "temp/audio.mp3";
-    const outputPath = "temp/output.mp4";
-
-    // tải video
-    const video = await axios.get(videoUrl, { responseType: "stream" });
-    video.data.pipe(fs.createWriteStream(videoPath));
-
-    // tải audio
-    const audio = await axios.get(audio_url, { responseType: "stream" });
-    audio.data.pipe(fs.createWriteStream(audioPath));
-
-    // chờ tải xong
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await downloadFile(audioUrl, audioPath);
+    await downloadFile(videoUrl, videoPath);
 
     ffmpeg()
-      .input(videoPath)
-      .input(audioPath)
+      .addInput(videoPath)
+      .addInput(audioPath)
+      .videoFilters([
+        {
+          filter: "drawtext",
+          options: {
+            text: text,
+            fontsize: 40,
+            fontcolor: "white",
+            x: "(w-text_w)/2",
+            y: "h-100"
+          }
+        }
+      ])
       .outputOptions("-shortest")
       .save(outputPath)
       .on("end", () => {
@@ -43,10 +51,8 @@ app.post("/render", async (req, res) => {
       });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Render error");
+    res.status(500).send(err.toString());
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server started on port " + PORT));
+app.listen(3000, () => console.log("Server running"));
