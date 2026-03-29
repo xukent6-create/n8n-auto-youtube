@@ -1,10 +1,9 @@
 {
   "name": "n8n-server",
   "version": "1.0.0",
-  "description": "n8n on Railway",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "start": "n8n"
+    "start": "npx n8n"
   },
   "dependencies": {
     "n8n": "latest"
