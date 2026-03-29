@@ -1,58 +1,37 @@
 const express = require("express");
-const ffmpeg = require("fluent-ffmpeg");
+const { exec } = require("child_process");
 const fs = require("fs-extra");
-const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 app.use(express.json());
 
-const downloadFile = async (url, path) => {
-  const writer = fs.createWriteStream(path);
-  const response = await axios({ url, method: "GET", responseType: "stream" });
-  response.data.pipe(writer);
-  return new Promise((resolve, reject) => {
-    writer.on("finish", resolve);
-    writer.on("error", reject);
-  });
-};
-
 app.post("/render", async (req, res) => {
-  try {
-    const id = uuidv4();
-    const audioPath = `audio-${id}.mp3`;
-    const videoPath = `video-${id}.mp4`;
-    const outputPath = `output-${id}.mp4`;
+  const { script, voiceUrl, stockVideo } = req.body;
 
-    const { audioUrl, videoUrl, text } = req.body;
+  const id = uuidv4();
+  const audio = `audio-${id}.mp3`;
+  const video = `video-${id}.mp4`;
+  const output = `output-${id}.mp4`;
 
-    await downloadFile(audioUrl, audioPath);
-    await downloadFile(videoUrl, videoPath);
+  // download audio
+  const axios = require("axios");
+  const writer = fs.createWriteStream(audio);
+  const response = await axios.get(voiceUrl, { responseType: "stream" });
+  response.data.pipe(writer);
 
-    ffmpeg()
-      .addInput(videoPath)
-      .addInput(audioPath)
-      .videoFilters([
-        {
-          filter: "drawtext",
-          options: {
-            text: text,
-            fontsize: 40,
-            fontcolor: "white",
-            x: "(w-text_w)/2",
-            y: "h-100"
-          }
-        }
-      ])
-      .outputOptions("-shortest")
-      .save(outputPath)
-      .on("end", () => {
-        res.download(outputPath);
-      });
+  writer.on("finish", () => {
+    const cmd = `
+    ffmpeg -stream_loop -1 -i ${stockVideo} -i ${audio} \
+    -shortest \
+    -vf "drawtext=text='${script.slice(0,50)}...':x=10:y=H-th-10:fontsize=28:fontcolor=white" \
+    -c:v libx264 -c:a aac ${output}
+    `;
 
-  } catch (err) {
-    res.status(500).send(err.toString());
-  }
+    exec(cmd, () => {
+      res.download(output);
+    });
+  });
 });
 
 app.listen(3000, () => console.log("Server running"));
