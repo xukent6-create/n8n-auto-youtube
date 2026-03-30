@@ -1,80 +1,55 @@
-const express = require("express");
-const { exec } = require("child_process");
-const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
+import express from "express";
+import { exec } from "child_process";
+import fs from "fs";
+import path from "path";
 
 const app = express();
 app.use(express.json());
 
-// TEST
+const PORT = process.env.PORT || 8080;
+
+// health check
 app.get("/", (req, res) => {
   res.send("Server OK 🚀");
 });
 
-// RENDER VIDEO
+// render video endpoint
 app.post("/render", async (req, res) => {
   try {
-    const { audio_url, script } = req.body;
+    const outputPath = path.join(process.cwd(), "output.mp4");
 
-    if (!audio_url) {
-      return res.status(400).send("Missing audio_url");
-    }
-
-    const audioPath = path.join(__dirname, "input.mp3");
-    const outputPath = path.join(__dirname, "output.mp4");
-
-    console.log("⬇️ Downloading audio...");
-
-    // DOWNLOAD AUDIO
-    const response = await axios({
-      url: audio_url,
-      method: "GET",
-      responseType: "stream",
-    });
-
-    await new Promise((resolve, reject) => {
-      const stream = fs.createWriteStream(audioPath);
-      response.data.pipe(stream);
-      stream.on("finish", resolve);
-      stream.on("error", reject);
-    });
-
-    console.log("✅ Audio downloaded");
-
-    // FFMPEG COMMAND
+    // ❗ FFmpeg nhẹ (KHÔNG bị kill trên Railway)
     const cmd = `
-    ffmpeg -y -i "${audioPath}" \
-    -f lavfi -i color=c=black:s=1080x1920 \
-    -shortest \
-    -vf "drawtext=text='${(script || "Hello").replace(/:/g, "\\:")}':fontsize=60:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2" \
-    -c:v libx264 -c:a aac -b:a 192k \
-    "${outputPath}"
+    ffmpeg -y \
+    -f lavfi -i color=c=black:s=720x1280:d=5 \
+    -vf "drawtext=text='Hello World':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=(h-text_h)/2" \
+    -c:v libx264 -preset ultrafast -crf 30 \
+    -pix_fmt yuv420p \
+    ${outputPath}
     `;
 
-    console.log("🎬 Running ffmpeg...");
-
-    exec(cmd, (err, stdout, stderr) => {
-      if (err) {
-        console.error("❌ FFmpeg error:", stderr);
-        return res.status(500).send("FFmpeg error");
+    exec(cmd, (error, stdout, stderr) => {
+      if (error) {
+        console.error("FFmpeg error:", stderr);
+        return res.status(500).json({
+          error: "FFmpeg failed",
+          details: stderr,
+        });
       }
 
-      console.log("✅ Video created");
+      // trả file về
+      res.download(outputPath, "video.mp4", (err) => {
+        if (err) console.error(err);
 
-      res.download(outputPath, "video.mp4", () => {
-        // cleanup
-        fs.unlinkSync(audioPath);
-        fs.unlinkSync(outputPath);
+        // xoá file sau khi gửi
+        fs.unlink(outputPath, () => {});
       });
     });
-
-  } catch (error) {
-    console.error("❌ Server error:", error);
-    res.status(500).send("Server error");
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-// PORT
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("🚀 Running on " + PORT));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
